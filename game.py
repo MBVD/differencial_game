@@ -1,5 +1,6 @@
 import tkinter as tk
 import math
+import random
 
 from driver import Driver
 from runner import Runner
@@ -8,7 +9,7 @@ from runner import Runner
 class Game:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("Игра шофёр-убийца")
+        self.root.title("Игра шофёр-убийца — автоматический режим")
 
         self.canvas_width = 1000
         self.canvas_height = 750
@@ -23,9 +24,15 @@ class Game:
 
         self.dt = 0.02
 
-        self.w1 = 120.0
-        self.w2 = 100.0
-        self.R = 120.0
+        # Параметры модели
+        self.w1 = 120.0   # скорость шофёра
+        self.w2 = 100.0   # скорость бегущего
+        self.R = 120.0    # минимальный радиус поворота шофёра
+        self.l = 35.0     # радиус захвата в редуцированном пространстве
+
+        # Коэффициент автопилота шофёра
+        self.driver_turn_gain = 2.2
+        self.driver_deadzone = 0.03
 
         self.driver = Driver()
         self.runner = Runner()
@@ -33,37 +40,82 @@ class Game:
         self.x = 0.0
         self.y = 0.0
 
-        self.keys = set()
-        self.control_mode = "runner"
+        # Служебное
+        self.paused = False
+        self.game_over = False
+        self.winner_text = ""
 
-        self.root.bind("<KeyPress>", self.on_key_press)
-        self.root.bind("<KeyRelease>", self.on_key_release)
-        self.root.bind("<Tab>", self.switch_control)
+        # Следы движения
+        self.driver_trail = []
+        self.runner_trail = []
+
+        self.root.bind("<space>", self.toggle_pause)
         self.root.bind("<r>", self.reset_game)
         self.root.bind("<R>", self.reset_game)
 
-        self.loop()
+        self.reset_game()
+
+    @staticmethod
+    def clamp(value, low, high):
+        return max(low, min(high, value))
+
+    @staticmethod
+    def sign(value):
+        if value > 0:
+            return 1.0
+        if value < 0:
+            return -1.0
+        return 0.0
+
+    def toggle_pause(self, event=None):
+        self.paused = not self.paused
 
     def reset_game(self, event=None):
         self.driver = Driver()
         self.runner = Runner()
+
+        margin = 80
+
+        # 🔹 случайная позиция шофёра
+        self.driver.x = random.uniform(margin, self.canvas_width - margin)
+        self.driver.y = random.uniform(margin, self.canvas_height - margin)
+
+        # 🔹 случайный угол машины
+        self.driver.theta = random.uniform(0, 2 * math.pi)
+        self.driver.phi = 0.0
+
+        # 🔹 генерируем бегущего так, чтобы он был не слишком близко
+        min_dist = 200
+
+        while True:
+            rx = random.uniform(margin, self.canvas_width - margin)
+            ry = random.uniform(margin, self.canvas_height - margin)
+
+            dx = rx - self.driver.x
+            dy = ry - self.driver.y
+            dist = math.hypot(dx, dy)
+
+            if dist > min_dist:
+                break
+
+        self.runner.x = rx
+        self.runner.y = ry
+
+        # 🔹 случайное направление бегущего
+        self.runner.psi = random.uniform(0, 2 * math.pi)
+
+        # редуцированные координаты
         self.x = 0.0
         self.y = 0.0
-        self.control_mode = "runner"
 
-    def on_key_press(self, event):
-        self.keys.add(event.keysym)
+        self.paused = False
+        self.game_over = False
+        self.winner_text = ""
 
-    def on_key_release(self, event):
-        if event.keysym in self.keys:
-            self.keys.remove(event.keysym)
+        self.driver_trail = []
+        self.runner_trail = []
 
-    def switch_control(self, event=None):
-        if self.control_mode == "runner":
-            self.control_mode = "driver"
-        else:
-            self.control_mode = "runner"
-        return "break"
+        self.update_reduced_coordinates()
 
     def keep_inside(self, obj, margin=15):
         if obj.x < margin:
@@ -75,11 +127,56 @@ class Game:
         if obj.y > self.canvas_height - margin:
             obj.y = self.canvas_height - margin
 
-    def update_absolute_motion(self):
-        if self.control_mode == "driver":
-            self.driver.update(self.keys)
+    def update_reduced_coordinates(self):
+        dx_world = self.runner.x - self.driver.x
+        dy_world = self.driver.y - self.runner.y
+
+        sin_t = math.sin(self.driver.theta)
+        cos_t = math.cos(self.driver.theta)
+
+        self.x = dx_world * cos_t - dy_world * sin_t
+        self.y = dx_world * sin_t + dy_world * cos_t
+
+    def reduced_to_world_runner_angle(self, u_red_x, u_red_y):
+        sin_t = math.sin(self.driver.theta)
+        cos_t = math.cos(self.driver.theta)
+
+        vx_world = u_red_x * cos_t + u_red_y * sin_t
+        vy_world = u_red_x * sin_t - u_red_y * cos_t
+
+        return math.atan2(vy_world, vx_world)
+
+    def compute_runner_autopilot(self):
+        r = math.hypot(self.x, self.y)
+        if r < 1e-9:
+            # если почти в центре, выбираем произвольное направление
+            u_red_x = 0.0
+            u_red_y = 1.0
         else:
-            self.runner.update(self.keys)
+            # наружу от центра
+            u_red_x = self.x / r
+            u_red_y = self.y / r
+
+        self.runner.psi = self.reduced_to_world_runner_angle(u_red_x, u_red_y)
+
+    def compute_driver_autopilot(self):
+        alpha = math.atan2(self.x, self.y)
+
+        if abs(alpha) < self.driver_deadzone:
+            phi = 0.0
+        else:
+            phi = self.driver_turn_gain * alpha
+
+        self.driver.phi = self.clamp(phi, -1.0, 1.0)
+
+    def compute_autopilot_controls(self):
+        self.update_reduced_coordinates()
+
+        self.compute_runner_autopilot()
+        self.compute_driver_autopilot()
+
+    def update_absolute_motion(self):
+        self.compute_autopilot_controls()
 
         self.driver.theta += (self.w1 / self.R) * self.driver.phi * self.dt
         self.driver.x += self.w1 * math.sin(self.driver.theta) * self.dt
@@ -91,19 +188,28 @@ class Game:
         self.keep_inside(self.driver)
         self.keep_inside(self.runner)
 
-    def update_reduced_coordinates(self):
-        dx_world = self.runner.x - self.driver.x
-        dy_world = self.driver.y - self.runner.y
+        self.update_reduced_coordinates()
 
-        sin_t = math.sin(self.driver.theta)
-        cos_t = math.cos(self.driver.theta)
-
-        self.x = dx_world * cos_t - dy_world * sin_t
-        self.y = dx_world * sin_t + dy_world * cos_t
+    def check_capture(self):
+        r = math.hypot(self.x, self.y)
+        if r <= self.l:
+            self.game_over = True
+            self.winner_text = "Шофёр поймал бегущего"
 
     def update(self):
+        if self.paused or self.game_over:
+            return
+
         self.update_absolute_motion()
-        self.update_reduced_coordinates()
+        self.check_capture()
+
+        self.driver_trail.append((self.driver.x, self.driver.y))
+        self.runner_trail.append((self.runner.x, self.runner.y))
+
+        if len(self.driver_trail) > 1000:
+            self.driver_trail.pop(0)
+        if len(self.runner_trail) > 1000:
+            self.runner_trail.pop(0)
 
     def draw_grid(self):
         step = 50
@@ -111,6 +217,19 @@ class Game:
             self.canvas.create_line(x, 0, x, self.canvas_height, fill="#eeeeee")
         for y in range(0, self.canvas_height, step):
             self.canvas.create_line(0, y, self.canvas_width, y, fill="#eeeeee")
+
+    def draw_trails(self):
+        if len(self.driver_trail) > 1:
+            for i in range(1, len(self.driver_trail)):
+                x1, y1 = self.driver_trail[i - 1]
+                x2, y2 = self.driver_trail[i]
+                self.canvas.create_line(x1, y1, x2, y2, fill="#7aa6ff", width=2)
+
+        if len(self.runner_trail) > 1:
+            for i in range(1, len(self.runner_trail)):
+                x1, y1 = self.runner_trail[i - 1]
+                x2, y2 = self.runner_trail[i]
+                self.canvas.create_line(x1, y1, x2, y2, fill="#ff8a8a", width=2)
 
     def draw_driver(self):
         px = self.driver.x
@@ -172,24 +291,24 @@ class Game:
         )
 
     def draw_info(self):
+        r = math.hypot(self.x, self.y)
+
         info_lines = [
-            "Управление:",
-            "tab — переключить управление",
+            "Автоматический режим",
+            "Space — пауза",
             "R — reset",
-            "Пешеход: вверх вниз вправо влево",
-            "Машина: A / D",
-            "",
-            f"Текущий режим: {self.control_mode}",
             "",
             f"P = ({self.driver.x:.2f}, {self.driver.y:.2f})",
             f"E = ({self.runner.x:.2f}, {self.runner.y:.2f})",
             "",
             f"x = {self.x:.2f}",
             f"y = {self.y:.2f}",
+            f"r = {r:.2f}",
+            f"l = {self.l:.2f}",
             "",
-            f"phi = {self.driver.phi:.2f}",
-            f"psi = {self.runner.psi:.2f}",
-            f"theta = {self.driver.theta:.2f}",
+            f"phi = {self.driver.phi:.3f}",
+            f"psi = {self.runner.psi:.3f}",
+            f"theta = {self.driver.theta:.3f}",
             "",
             f"w1 = {self.w1}",
             f"w2 = {self.w2}",
@@ -208,10 +327,10 @@ class Game:
             y0 += 22
 
     def draw_reduced_preview(self):
-        box_x = 720
-        box_y = 40
-        box_w = 240
-        box_h = 240
+        box_x = 700
+        box_y = 30
+        box_w = 270
+        box_h = 270
 
         self.canvas.create_rectangle(
             box_x, box_y,
@@ -231,8 +350,24 @@ class Game:
         self.canvas.create_line(box_x, cy, box_x + box_w, cy, fill="gray")
         self.canvas.create_line(cx, box_y, cx, box_y + box_h, fill="gray")
 
-        scale = 0.5
+        scale = 0.55
 
+        # Терминальное множество: круг радиуса l
+        rl = self.l * scale
+        self.canvas.create_oval(
+            cx - rl, cy - rl,
+            cx + rl, cy + rl,
+            outline="green", width=2
+        )
+
+        self.canvas.create_text(
+            cx + rl + 18, cy,
+            text="E",
+            fill="green",
+            font=("Arial", 10, "bold")
+        )
+
+        # В редуцированном пространстве шофёр в центре
         px = cx
         py = cy
         ex = cx + self.x * scale
@@ -244,14 +379,46 @@ class Game:
         self.canvas.create_oval(ex - 7, ey - 7, ex + 7, ey + 7, fill="red")
         self.canvas.create_text(ex, ey - 15, text="E", fill="red")
 
+        self.canvas.create_line(px, py, ex, ey, fill="#666666", dash=(4, 2))
+
+    def draw_status(self):
+        if self.paused:
+            self.canvas.create_text(
+                self.canvas_width / 2,
+                35,
+                text="ПАУЗА",
+                fill="orange",
+                font=("Arial", 20, "bold")
+            )
+
+        if self.game_over:
+            self.canvas.create_rectangle(
+                260, 300, 740, 390,
+                fill="#ffffdd", outline="black", width=2
+            )
+            self.canvas.create_text(
+                500, 330,
+                text=self.winner_text,
+                fill="darkgreen",
+                font=("Arial", 22, "bold")
+            )
+            self.canvas.create_text(
+                500, 365,
+                text="Нажмите R для перезапуска",
+                fill="black",
+                font=("Arial", 14)
+            )
+
     def draw(self):
         self.canvas.delete("all")
         self.draw_grid()
+        self.draw_trails()
         self.draw_relative_vector()
         self.draw_driver()
         self.draw_runner()
         self.draw_info()
         self.draw_reduced_preview()
+        self.draw_status()
 
     def loop(self):
         self.update()
@@ -259,6 +426,7 @@ class Game:
         self.root.after(int(self.dt * 1000), self.loop)
 
     def run(self):
+        self.loop()
         self.root.mainloop()
 
 
