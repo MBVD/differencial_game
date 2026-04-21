@@ -24,13 +24,11 @@ class Game:
 
         self.dt = 0.02
 
-        # Параметры модели
-        self.w1 = 120.0   # скорость шофёра
-        self.w2 = 100.0   # скорость бегущего
-        self.R = 120.0    # минимальный радиус поворота шофёра
-        self.l = 35.0     # радиус захвата в редуцированном пространстве
+        self.w1 = 120.0   
+        self.w2 = 100.0   
+        self.R = 120.0     
+        self.l = 35.0
 
-        # Коэффициент автопилота шофёра
         self.driver_turn_gain = 2.2
         self.driver_deadzone = 0.03
 
@@ -40,12 +38,10 @@ class Game:
         self.x = 0.0
         self.y = 0.0
 
-        # Служебное
         self.paused = False
         self.game_over = False
         self.winner_text = ""
 
-        # Следы движения
         self.driver_trail = []
         self.runner_trail = []
 
@@ -76,16 +72,13 @@ class Game:
 
         margin = 80
 
-        # 🔹 случайная позиция шофёра
         self.driver.x = random.uniform(margin, self.canvas_width - margin)
         self.driver.y = random.uniform(margin, self.canvas_height - margin)
 
-        # 🔹 случайный угол машины
         self.driver.theta = random.uniform(0, 2 * math.pi)
         self.driver.phi = 0.0
 
-        # 🔹 генерируем бегущего так, чтобы он был не слишком близко
-        min_dist = 200
+        min_dist = 100
 
         while True:
             rx = random.uniform(margin, self.canvas_width - margin)
@@ -101,10 +94,8 @@ class Game:
         self.runner.x = rx
         self.runner.y = ry
 
-        # 🔹 случайное направление бегущего
         self.runner.psi = random.uniform(0, 2 * math.pi)
 
-        # редуцированные координаты
         self.x = 0.0
         self.y = 0.0
 
@@ -149,11 +140,9 @@ class Game:
     def compute_runner_autopilot(self):
         r = math.hypot(self.x, self.y)
         if r < 1e-9:
-            # если почти в центре, выбираем произвольное направление
             u_red_x = 0.0
             u_red_y = 1.0
         else:
-            # наружу от центра
             u_red_x = self.x / r
             u_red_y = self.y / r
 
@@ -352,7 +341,6 @@ class Game:
 
         scale = 0.55
 
-        # Терминальное множество: круг радиуса l
         rl = self.l * scale
         self.canvas.create_oval(
             cx - rl, cy - rl,
@@ -367,7 +355,6 @@ class Game:
             font=("Arial", 10, "bold")
         )
 
-        # В редуцированном пространстве шофёр в центре
         px = cx
         py = cy
         ex = cx + self.x * scale
