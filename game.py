@@ -56,12 +56,10 @@ class Game:
             -self.grid_half_y + j * self.grid_step for j in range(self.grid_ny)
         ]
 
-        # Таблица функции цены V
         self.value_grid = [
             [0.0 for _ in range(self.grid_nx)] for _ in range(self.grid_ny)
         ]
 
-        # Дискретизация управлений для численного динамического программирования
         self.phi_candidates = [-1.0, 0.0, 1.0]
         self.psi_candidates = [
             2.0 * math.pi * k / 24.0 for k in range(24)
@@ -169,9 +167,7 @@ class Game:
 
         return math.atan2(vy_world, vx_world)
 
-    # -----------------------------
     # Численное решение функции цены
-    # -----------------------------
     def is_terminal(self, x, y):
         return math.hypot(x, y) <= self.l
 
@@ -223,7 +219,6 @@ class Game:
     def precompute_value_grid(self):
         large_value = 200.0
 
-        # Начальное приближение
         for j, y in enumerate(self.y_values):
             for i, x in enumerate(self.x_values):
                 if self.is_terminal(x, y):
@@ -300,7 +295,6 @@ class Game:
             u_red_x = 0.0
             u_red_y = 1.0
         else:
-            # Точно по файлу:
             # sin(psi) = Vx / sqrt(Vx^2 + Vy^2)
             # cos(psi) = Vy / sqrt(Vx^2 + Vy^2)
             u_red_x = vx / rho
@@ -581,8 +575,3 @@ class Game:
     def run(self):
         self.loop()
         self.root.mainloop()
-
-
-if __name__ == "__main__":
-    game = Game()
-    game.run()
