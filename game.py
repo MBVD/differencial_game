@@ -6,6 +6,7 @@ from driver import Driver
 from runner import Runner
 from plot import ValueFunctionPlotter
 from value_solver import ValueFunctionSolver
+from scattering import ScatteringSurfaceController
 
 
 class Game:
@@ -42,6 +43,13 @@ class Game:
             iterations=60,
             tau=0.08,
             large_value=200.0
+        )
+        self.scattering_controller = ScatteringSurfaceController(
+            w1=self.w1,
+            w2=self.w2,
+            R=self.R,
+            l=self.l,
+            distance_eps=18.0
         )
 
         self.driver = Driver()
@@ -199,6 +207,21 @@ class Game:
         return math.atan2(vy_world, vx_world)
 
     def compute_runner_autopilot(self):
+        if self.scattering_controller.is_near_wall(self.x, self.y):
+            u_red_x, u_red_y = (
+                self.scattering_controller.compute_runner_direction_near_wall(
+                    self.x,
+                    self.y
+                )
+            )
+
+            self.runner.psi = self.reduced_to_world_runner_angle(
+                u_red_x,
+                u_red_y
+            )
+
+            return
+
         vx, vy = self.estimate_value_gradient(self.x, self.y)
         rho = math.hypot(vx, vy)
 
@@ -215,6 +238,16 @@ class Game:
         )
 
     def compute_driver_autopilot(self):
+        if self.scattering_controller.is_near_wall(self.x, self.y):
+            self.driver.phi = (
+                self.scattering_controller.compute_driver_phi_near_wall(
+                    self.x,
+                    self.y
+                )
+            )
+
+            return
+
         vx, vy = self.estimate_value_gradient(self.x, self.y)
 
         switching_value = -vx * self.y + self.x * vy
@@ -415,6 +448,8 @@ class Game:
         r = math.hypot(self.x, self.y)
         vx, vy = self.estimate_value_gradient(self.x, self.y)
         switching_value = -vx * self.y + self.x * vy
+        near_wall = self.scattering_controller.is_near_wall(self.x, self.y)
+        wall_y = self.scattering_controller.wall_y
 
         info_lines = [
             "Автоматический режим по HJI",
@@ -436,6 +471,9 @@ class Game:
             f"Vx = {vx:.3f}",
             f"Vy = {vy:.3f}",
             f"switch = {switching_value:.3f}",
+            "",
+            f"wall y = {wall_y:.2f}",
+            f"near wall = {near_wall}",
             "",
             f"w1 = {self.w1}",
             f"w2 = {self.w2}",
@@ -515,6 +553,27 @@ class Game:
             cy,
             text="E",
             fill="green",
+            font=("Arial", 10, "bold")
+        )
+
+        wall_y_reduced = self.scattering_controller.wall_y
+        wall_screen_y = cy - wall_y_reduced * scale
+
+        self.canvas.create_line(
+            box_x,
+            wall_screen_y,
+            box_x + box_w,
+            wall_screen_y,
+            fill="purple",
+            width=2,
+            dash=(6, 3)
+        )
+
+        self.canvas.create_text(
+            box_x + box_w - 50,
+            wall_screen_y - 10,
+            text="wall",
+            fill="purple",
             font=("Arial", 10, "bold")
         )
 
