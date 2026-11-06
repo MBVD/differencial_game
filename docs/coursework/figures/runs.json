@@ -1,0 +1,36 @@
+[
+  {
+    "h": 20.0,
+    "tau": 0.09091,
+    "n": 61,
+    "iterations": 1872,
+    "converged": true,
+    "residual": 9.966626716817473e-05,
+    "time_s": 7.96,
+    "axis_err": 7.798
+  },
+  {
+    "h": 10.0,
+    "tau": 0.04545,
+    "n": 121,
+    "iterations": 2645,
+    "converged": true,
+    "residual": 9.993533947749711e-05,
+    "time_s": 63.08,
+    "axis_err": 2.45,
+    "diff_vs_coarser_mean": 4.354,
+    "diff_vs_coarser_max": 12.294
+  },
+  {
+    "h": 5.0,
+    "tau": 0.02273,
+    "n": 241,
+    "iterations": 3896,
+    "converged": true,
+    "residual": 9.967876808048004e-05,
+    "time_s": 464.44,
+    "axis_err": 0.109,
+    "diff_vs_coarser_mean": 1.489,
+    "diff_vs_coarser_max": 4.081
+  }
+]

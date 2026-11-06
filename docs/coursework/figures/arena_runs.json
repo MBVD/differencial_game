@@ -1,0 +1,43 @@
+{
+  "P:hji / E:hji": {
+    "games": 200,
+    "captured": 200,
+    "mean_time": 7.56,
+    "max_time": 48.7,
+    "evader_at_wall": 49,
+    "wall_s": 145.9
+  },
+  "P:pursuit / E:hji": {
+    "games": 200,
+    "captured": 200,
+    "mean_time": 5.35,
+    "max_time": 9.38,
+    "evader_at_wall": 71,
+    "wall_s": 106.0
+  },
+  "P:hji / E:flee": {
+    "games": 200,
+    "captured": 200,
+    "mean_time": 5.87,
+    "max_time": 10.58,
+    "evader_at_wall": 200,
+    "wall_s": 102.0
+  },
+  "P:pursuit / E:flee": {
+    "games": 200,
+    "captured": 200,
+    "mean_time": 5.66,
+    "max_time": 8.72,
+    "evader_at_wall": 200,
+    "wall_s": 98.6
+  },
+  "config": {
+    "horizon": 0.3,
+    "evader_tail": 2.0
+  },
+  "decision_ms": 4.44,
+  "fixed_start": {
+    "capture_time": 5.1,
+    "reduced_value": 21.41
+  }
+}

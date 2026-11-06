@@ -21,4 +21,5 @@ class Runner:
             dx += 1
 
         if dx != 0 or dy != 0:
-            self.psi = math.atan2(dy, dx)
+            # The model angle is measured from the forward (screen-up) axis.
+            self.psi = math.atan2(dx, -dy)
