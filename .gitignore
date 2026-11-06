@@ -1,0 +1,56 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Виртуальные окружения
+.venv/
+venv/
+env/
+
+# --- Сборка курсовой (PDF, логи) и кэш расчётов графиков ---
+# build/coursework/ — результат xelatex, build/hji_cache/ — кэш make_figures.py
+build/
+
+# Временные файлы LaTeX, если собирать прямо в docs/coursework
+docs/coursework/*.aux
+docs/coursework/*.log
+docs/coursework/*.out
+docs/coursework/*.toc
+docs/coursework/*.synctex.gz
+docs/coursework/*.fls
+docs/coursework/*.fdb_latexmk
+docs/coursework/*.xdv
+docs/coursework/*.bbl
+docs/coursework/*.blg
+docs/coursework/*.pdf
+texput.log
+
+# Резервные копии исходников
+*.backup.tex
+*.bak
+*~
+
+# --- Временные файлы решателей ---
+*.json.tmp
+*.tmp
+
+# --- Служебные папки ---
+# копии файлов, которые Claude отправлял в чат
+Claude outputs/
+
+# --- Редакторы и IDE ---
+.vscode/
+.idea/
+*.swp
+
+# --- Системные файлы ---
+.DS_Store
+Thumbs.db
+desktop.ini
